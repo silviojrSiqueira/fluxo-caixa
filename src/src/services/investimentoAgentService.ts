@@ -1,4 +1,4 @@
-import { MensagemChat, OpenFinanceSnapshot, Investimento } from '../types';
+import { MensagemChat, OpenFinanceSnapshot } from '../types';
 
 export class InvestimentoAgentService {
   static async chat(mensagens: MensagemChat[], snapshot?: OpenFinanceSnapshot): Promise<string> {
@@ -249,7 +249,7 @@ export class InvestimentoAgentService {
     return analise;
   }
 
-  private static analiseGeral(snapshot?: OpenFinanceSnapshot): string {
+  private static analiseGeral(_snapshot?: OpenFinanceSnapshot): string {
     let analise = `📊 **Agente de Investimentos**\n\n`;
     analise += `Posso ajudá-lo com:\n\n`;
     analise += `• 📈 Análise de rentabilidade\n`;

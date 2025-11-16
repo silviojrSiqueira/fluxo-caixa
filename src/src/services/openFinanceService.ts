@@ -85,7 +85,7 @@ export class OpenFinanceService {
           tipo: transacao.tipo === 'entrada' ? 'receita' : 'despesa',
           categoria: transacao.categoria || 'Open Finance',
           descricao: transacao.descricao,
-          valor: Math.abs(parseFloat(transacao.valor) || 0),
+          valor: Math.abs(Number(transacao.valor) || 0),
           data: transacao.data_transacao,
           origem: 'open_finance'
         });
@@ -95,8 +95,8 @@ export class OpenFinanceService {
     // Adiciona saldo de investimentos como receita potencial
     if (snapshot.investimentos) {
       snapshot.investimentos.forEach(inv => {
-        const valorAtual = parseFloat(inv.valor_atual) || 0;
-        const valorAplicado = parseFloat(inv.valor_aplicado) || 0;
+        const valorAtual = Number(inv.valor_atual) || 0;
+        const valorAplicado = Number(inv.valor_aplicado) || 0;
         const rendimento = valorAtual - valorAplicado;
         if (rendimento > 0) {
           entradas.push({
@@ -136,10 +136,10 @@ export class OpenFinanceService {
   }
 
   static calcularResumoFinanceiro(snapshot: OpenFinanceSnapshot) {
-    const saldoContas = snapshot.contas?.reduce((acc, conta) => acc + (parseFloat(conta.saldo) || 0), 0) || 0;
-    const totalInvestimentos = snapshot.investimentos?.reduce((acc, inv) => acc + (parseFloat(inv.valor_atual) || 0), 0) || 0;
-    const totalDividas = snapshot.operacoes_credito?.reduce((acc, op) => acc + (parseFloat(op.saldo_devedor) || 0), 0) || 0;
-    const limiteCartoes = snapshot.cartoes?.reduce((acc, cartao) => acc + (parseFloat(cartao.limite_disponivel) || 0), 0) || 0;
+    const saldoContas = snapshot.contas?.reduce((acc, conta) => acc + (Number(conta.saldo) || 0), 0) || 0;
+    const totalInvestimentos = snapshot.investimentos?.reduce((acc, inv) => acc + (Number(inv.valor_atual) || 0), 0) || 0;
+    const totalDividas = snapshot.operacoes_credito?.reduce((acc, op) => acc + (Number(op.saldo_devedor) || 0), 0) || 0;
+    const limiteCartoes = snapshot.cartoes?.reduce((acc, cartao) => acc + (Number(cartao.limite_disponivel) || 0), 0) || 0;
 
     return {
       saldoContas,
