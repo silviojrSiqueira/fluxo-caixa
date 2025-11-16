@@ -12,15 +12,23 @@ const __dirname = path.dirname(__filename);
 
 const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema-postgres.sql');
 
+// Obtém a URL do banco de dados
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5432/fluxo_caixa';
+const isProduction = process.env.NODE_ENV === 'production';
+
+console.log('🔗 Configurando conexão com PostgreSQL...');
+console.log(`   Ambiente: ${isProduction ? 'PRODUÇÃO' : 'DESENVOLVIMENTO'}`);
+console.log(`   Database URL: ${DATABASE_URL.replace(/:[^:@]+@/, ':****@')}`); // Oculta senha no log
+
 // Configuração do pool de conexões PostgreSQL
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/fluxo_caixa',
-  ssl: process.env.NODE_ENV === 'production' ? {
+  connectionString: DATABASE_URL,
+  ssl: isProduction ? {
     rejectUnauthorized: false
   } : false,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000, // Aumentado para 10s para conexões lentas
 });
 
 // Log de conexão
@@ -38,7 +46,15 @@ export async function initializeDatabase() {
   console.log('🔄 Inicializando banco de dados PostgreSQL...');
   
   try {
+    // Testa a conexão primeiro
+    console.log('🔌 Testando conexão com o banco...');
+    const testResult = await pool.query('SELECT NOW() as now, version() as version');
+    console.log('✅ Conexão estabelecida com sucesso!');
+    console.log(`   Hora do servidor: ${testResult.rows[0].now}`);
+    console.log(`   Versão PostgreSQL: ${testResult.rows[0].version.split(',')[0]}`);
+    
     // Lê e executa o schema SQL
+    console.log('📋 Criando/verificando schema...');
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
     await pool.query(schema);
     
@@ -46,8 +62,14 @@ export async function initializeDatabase() {
     
     // Aplica seeds se as tabelas estiverem vazias
     await applySeedsIfNeeded();
+    
+    console.log('🎉 Banco de dados pronto para uso!');
   } catch (error) {
     console.error('❌ Erro ao inicializar banco:', error);
+    console.error('💡 Verifique se:');
+    console.error('   1. A variável DATABASE_URL está configurada corretamente');
+    console.error('   2. O banco PostgreSQL está rodando e acessível');
+    console.error('   3. As credenciais estão corretas');
     throw error;
   }
 }
