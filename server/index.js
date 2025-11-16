@@ -5,8 +5,15 @@ import pool, { initializeDatabase } from './database.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Configuração CORS para aceitar frontend
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // Middlewares
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Inicializa o banco de dados
