@@ -22,6 +22,7 @@ function App() {
 
   const [abaAtiva, setAbaAtiva] = useState<'entradas' | 'consolidado' | 'backup' | 'openfinance' | 'regras'>('entradas');
   const [modalAberto, setModalAberto] = useState<'ai' | 'financeiro' | 'investimento' | 'regras' | null>(null);
+  const [menuAberto, setMenuAberto] = useState(false);
 
   const [novaEntrada, setNovaEntrada] = useState<Partial<Entrada>>({
     tipo: 'despesa',
@@ -82,7 +83,7 @@ function App() {
         mostrarMensagem('sucesso', av.mensagem);
       }
     });
-  }, [planilhaIntegrada, snapshot]);
+  }, [planilhaIntegrada, snapshot, regrasIA]);
 
   const mostrarMensagem = (tipo: 'sucesso' | 'erro', texto: string) => {
     setMensagem({ tipo, texto });
@@ -108,7 +109,6 @@ function App() {
       origem: 'manual'
     };
 
-    // Adiciona localmente primeiro (para melhor UX)
     setPlanilhaData(prev => ({
       ...prev,
       entradas: [...prev.entradas, entrada]
@@ -127,19 +127,17 @@ function App() {
       data: new Date().toISOString().split('T')[0]
     });
 
-    // Tenta salvar no banco de dados
     try {
       await EntradasService.criarEntrada(entrada);
       setFonteEntradas('database');
-      mostrarMensagem('sucesso', '✅ Entrada salva no banco de dados!');
+      mostrarMensagem('sucesso', '✅ Entrada salva!');
     } catch (error) {
-      console.error('Erro ao salvar no banco, usando localStorage:', error);
-      mostrarMensagem('sucesso', '⚠️ Entrada salva localmente (banco indisponível)');
+      console.error('Erro ao salvar no banco:', error);
+      mostrarMensagem('sucesso', '⚠️ Salvo localmente');
     }
   };
 
   const removerEntrada = async (id: string) => {
-    // Remove localmente primeiro (para melhor UX)
     setPlanilhaData(prev => ({
       ...prev,
       entradas: prev.entradas.filter(e => e.id !== id)
@@ -150,13 +148,12 @@ function App() {
       entradas: prev.entradas.filter(e => e.id !== id)
     }));
 
-    // Tenta remover do banco de dados
     try {
       await EntradasService.removerEntrada(id);
-      mostrarMensagem('sucesso', '✅ Entrada removida do banco de dados!');
+      mostrarMensagem('sucesso', '✅ Entrada removida!');
     } catch (error) {
       console.error('Erro ao remover do banco:', error);
-      mostrarMensagem('sucesso', '⚠️ Entrada removida localmente (banco indisponível)');
+      mostrarMensagem('sucesso', '⚠️ Removido localmente');
     }
   };
 
@@ -175,7 +172,7 @@ function App() {
       mostrarMensagem('sucesso', 'Dados Open Finance atualizados!');
     } catch (error) {
       console.error('Erro ao atualizar Open Finance:', error);
-      mostrarMensagem('erro', 'Erro ao conectar com Open Finance. Verifique se o servidor está rodando.');
+      mostrarMensagem('erro', 'Erro ao conectar com Open Finance');
     } finally {
       setCarregando(false);
     }
@@ -204,7 +201,7 @@ function App() {
     link.download = `backup-fluxo-caixa-${new Date().toISOString()}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    mostrarMensagem('sucesso', 'Backup exportado com sucesso!');
+    mostrarMensagem('sucesso', 'Backup exportado!');
   };
 
   const importarBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,14 +214,13 @@ function App() {
         const conteudo = e.target?.result as string;
         StorageService.importarBackup(conteudo);
 
-        // Recarrega os dados
         const novaPlanilha = StorageService.carregarPlanilha();
         setPlanilhaData(novaPlanilha);
         setPlanilhaIntegrada(novaPlanilha);
         setRegrasIA(StorageService.carregarRegrasIA());
         setProjecoes(StorageService.carregarProjecoes());
 
-        mostrarMensagem('sucesso', 'Backup restaurado com sucesso!');
+        mostrarMensagem('sucesso', 'Backup restaurado!');
       } catch (error) {
         mostrarMensagem('erro', 'Erro ao importar backup');
       }
@@ -262,335 +258,424 @@ function App() {
         } />
 
         <Route path="/" element={
-          <div className="app">
+          <div className="app-container">
+            {/* Header Responsivo */}
             <header className="app-header">
-              <div>
-                <h1>💰 Fluxo de Caixa</h1>
-                <small style={{ opacity: 0.8, fontSize: '12px' }}>
-                  {fonteEntradas === 'database' ? '🗄️ Conectado ao banco de dados' : '💾 Modo offline (localStorage)'}
-                </small>
-              </div>
-              <div className="header-actions">
-                <button onClick={() => setModalAberto('ai')} className="btn-agent">
-                  💬 Chat IA
-                </button>
-                <button onClick={() => setModalAberto('financeiro')} className="btn-agent btn-financeiro">
-                  🏦 Agente Financeiro
-                </button>
-                <button onClick={() => setModalAberto('investimento')} className="btn-agent btn-investimento">
-                  📊 Agente Investimentos
-                </button>
-                <Link to="/mobile-preview" className="btn-mobile">
-                  📱 Visualizar Mobile
-                </Link>
+              <div className="header-content">
+                <div className="header-left">
+                  <button
+                    className="menu-toggle"
+                    onClick={() => setMenuAberto(!menuAberto)}
+                    aria-label="Menu"
+                  >
+                    ☰
+                  </button>
+                  <h1 className="app-logo">
+                    💰 Fluxo de Caixa
+                  </h1>
+                </div>
+
+                <div className="header-actions">
+                  <div className="db-status">
+                    <span className={`status-indicator ${fonteEntradas === 'database' ? 'online' : 'offline'}`} />
+                    <span>{fonteEntradas === 'database' ? 'Online' : 'Offline'}</span>
+                  </div>
+
+                  <nav className="desktop-nav">
+                    <button
+                      className={`nav-button ${abaAtiva === 'entradas' ? 'active' : ''}`}
+                      onClick={() => setAbaAtiva('entradas')}
+                    >
+                      📝 Entradas
+                    </button>
+                    <button
+                      className={`nav-button ${abaAtiva === 'consolidado' ? 'active' : ''}`}
+                      onClick={() => setAbaAtiva('consolidado')}
+                    >
+                      📊 Consolidado
+                    </button>
+                    <button
+                      className={`nav-button ${abaAtiva === 'openfinance' ? 'active' : ''}`}
+                      onClick={() => setAbaAtiva('openfinance')}
+                    >
+                      🏦 Open Finance
+                    </button>
+                    <button
+                      className={`nav-button ${abaAtiva === 'regras' ? 'active' : ''}`}
+                      onClick={() => setAbaAtiva('regras')}
+                    >
+                      ⚙️ Regras IA
+                    </button>
+                    <button
+                      className={`nav-button ${abaAtiva === 'backup' ? 'active' : ''}`}
+                      onClick={() => setAbaAtiva('backup')}
+                    >
+                      💾 Backup
+                    </button>
+                  </nav>
+                </div>
               </div>
             </header>
 
+            {/* Menu Mobile */}
+            <div className={`mobile-menu-overlay ${menuAberto ? 'open' : ''}`} onClick={() => setMenuAberto(false)}>
+              <div className={`mobile-menu ${menuAberto ? 'open' : ''}`} onClick={(e) => e.stopPropagation()}>
+                <div className="mobile-menu-header">
+                  <h2>Menu</h2>
+                  <button className="close-menu" onClick={() => setMenuAberto(false)}>✕</button>
+                </div>
+                <nav className="mobile-menu-nav">
+                  <button
+                    className={`mobile-menu-item ${abaAtiva === 'entradas' ? 'active' : ''}`}
+                    onClick={() => { setAbaAtiva('entradas'); setMenuAberto(false); }}
+                  >
+                    📝 Entradas
+                  </button>
+                  <button
+                    className={`mobile-menu-item ${abaAtiva === 'consolidado' ? 'active' : ''}`}
+                    onClick={() => { setAbaAtiva('consolidado'); setMenuAberto(false); }}
+                  >
+                    📊 Consolidado
+                  </button>
+                  <button
+                    className={`mobile-menu-item ${abaAtiva === 'openfinance' ? 'active' : ''}`}
+                    onClick={() => { setAbaAtiva('openfinance'); setMenuAberto(false); }}
+                  >
+                    🏦 Open Finance
+                  </button>
+                  <button
+                    className={`mobile-menu-item ${abaAtiva === 'regras' ? 'active' : ''}`}
+                    onClick={() => { setAbaAtiva('regras'); setMenuAberto(false); }}
+                  >
+                    ⚙️ Regras IA
+                  </button>
+                  <button
+                    className={`mobile-menu-item ${abaAtiva === 'backup' ? 'active' : ''}`}
+                    onClick={() => { setAbaAtiva('backup'); setMenuAberto(false); }}
+                  >
+                    💾 Backup
+                  </button>
+                  <div className="menu-divider" />
+                  <button
+                    className="mobile-menu-item"
+                    onClick={() => { setModalAberto('ai'); setMenuAberto(false); }}
+                  >
+                    💬 Chat IA
+                  </button>
+                  <button
+                    className="mobile-menu-item"
+                    onClick={() => { setModalAberto('financeiro'); setMenuAberto(false); }}
+                  >
+                    🏦 Agente Financeiro
+                  </button>
+                  <button
+                    className="mobile-menu-item"
+                    onClick={() => { setModalAberto('investimento'); setMenuAberto(false); }}
+                  >
+                    📊 Agente Investimentos
+                  </button>
+                  <div className="menu-divider" />
+                  <Link to="/mobile-preview" className="mobile-menu-item">
+                    📱 Preview Original
+                  </Link>
+                </nav>
+              </div>
+            </div>
+
+            {/* Mensagem Toast */}
             {mensagem && (
-              <div className={`mensagem mensagem-${mensagem.tipo}`}>
+              <div className={`message ${mensagem.tipo}`}>
                 {mensagem.texto}
               </div>
             )}
 
-            <div className="resumo-geral">
-              <div className="resumo-card receitas">
-                <div className="resumo-label">💰 Receitas</div>
-                <div className="resumo-valor">R$ {resumo.receitas.toFixed(2)}</div>
-              </div>
-              <div className="resumo-card despesas">
-                <div className="resumo-label">💸 Despesas</div>
-                <div className="resumo-valor">R$ {resumo.despesas.toFixed(2)}</div>
-              </div>
-              <div className={`resumo-card saldo ${resumo.saldo >= 0 ? 'positivo' : 'negativo'}`}>
-                <div className="resumo-label">📊 Saldo</div>
-                <div className="resumo-valor">R$ {resumo.saldo.toFixed(2)}</div>
-              </div>
-            </div>
-
-            <div className="abas">
-              <button
-                className={`aba ${abaAtiva === 'entradas' ? 'ativa' : ''}`}
-                onClick={() => setAbaAtiva('entradas')}
-              >
-                📝 Entradas
-              </button>
-              <button
-                className={`aba ${abaAtiva === 'consolidado' ? 'ativa' : ''}`}
-                onClick={() => setAbaAtiva('consolidado')}
-              >
-                📊 Consolidado
-              </button>
-              <button
-                className={`aba ${abaAtiva === 'openfinance' ? 'ativa' : ''}`}
-                onClick={() => setAbaAtiva('openfinance')}
-              >
-                🏦 Open Finance
-              </button>
-              <button
-                className={`aba ${abaAtiva === 'regras' ? 'ativa' : ''}`}
-                onClick={() => setAbaAtiva('regras')}
-              >
-                ⚙️ Regras IA
-              </button>
-              <button
-                className={`aba ${abaAtiva === 'backup' ? 'ativa' : ''}`}
-                onClick={() => setAbaAtiva('backup')}
-              >
-                💾 Backup
-              </button>
-            </div>
-
-            <div className="conteudo">
-              {abaAtiva === 'entradas' && (
-                <div className="aba-entradas">
-                  <div className="formulario-entrada">
-                    <h2>Nova Entrada</h2>
-                    <div className="form-group">
-                      <label>Tipo:</label>
-                      <select
-                        value={novaEntrada.tipo}
-                        onChange={(e) => setNovaEntrada({ ...novaEntrada, tipo: e.target.value as any })}
-                      >
-                        <option value="receita">Receita</option>
-                        <option value="despesa">Despesa</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Categoria:</label>
-                      <input
-                        type="text"
-                        value={novaEntrada.categoria}
-                        onChange={(e) => setNovaEntrada({ ...novaEntrada, categoria: e.target.value })}
-                        list="categorias"
-                      />
-                      <datalist id="categorias">
-                        {planilhaData.categorias.map(cat => (
-                          <option key={cat} value={cat} />
-                        ))}
-                      </datalist>
-                    </div>
-                    <div className="form-group">
-                      <label>Descrição:</label>
-                      <input
-                        type="text"
-                        value={novaEntrada.descricao}
-                        onChange={(e) => setNovaEntrada({ ...novaEntrada, descricao: e.target.value })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Valor:</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={novaEntrada.valor}
-                        onChange={(e) => setNovaEntrada({ ...novaEntrada, valor: parseFloat(e.target.value) })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Data:</label>
-                      <input
-                        type="date"
-                        value={novaEntrada.data}
-                        onChange={(e) => setNovaEntrada({ ...novaEntrada, data: e.target.value })}
-                      />
-                    </div>
-                    <button onClick={adicionarEntrada} className="btn-primary">
-                      ➕ Adicionar
-                    </button>
+            {/* Conteúdo Principal */}
+            <main className="app-main">
+              {/* Cards de Resumo */}
+              <div className="summary-cards">
+                <div className="summary-card receitas">
+                  <div className="card-icon">💰</div>
+                  <div className="card-content">
+                    <div className="card-label">Receitas</div>
+                    <div className="card-value">R$ {resumo.receitas.toFixed(2)}</div>
                   </div>
+                </div>
 
-                  <div className="lista-entradas">
-                    <h2>Entradas Cadastradas ({planilhaData.entradas.length})</h2>
+                <div className="summary-card despesas">
+                  <div className="card-icon">💸</div>
+                  <div className="card-content">
+                    <div className="card-label">Despesas</div>
+                    <div className="card-value">R$ {resumo.despesas.toFixed(2)}</div>
+                  </div>
+                </div>
+
+                <div className="summary-card saldo">
+                  <div className="card-icon">📊</div>
+                  <div className="card-content">
+                    <div className="card-label">Saldo</div>
+                    <div className={`card-value ${resumo.saldo >= 0 ? 'positive' : 'negative'}`}>
+                      R$ {resumo.saldo.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Conteúdo das Abas */}
+              {abaAtiva === 'entradas' && (
+                <>
+                  <section className="section">
+                    <div className="section-header">
+                      <h2 className="section-title">➕ Nova Entrada</h2>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label className="form-label">Tipo</label>
+                        <select
+                          className="form-select"
+                          value={novaEntrada.tipo}
+                          onChange={(e) => setNovaEntrada({ ...novaEntrada, tipo: e.target.value as any })}
+                        >
+                          <option value="receita">💰 Receita</option>
+                          <option value="despesa">💸 Despesa</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Categoria</label>
+                        <input
+                          className="form-input"
+                          type="text"
+                          value={novaEntrada.categoria}
+                          onChange={(e) => setNovaEntrada({ ...novaEntrada, categoria: e.target.value })}
+                          list="categorias"
+                          placeholder="Ex: Salário, Alimentação..."
+                        />
+                        <datalist id="categorias">
+                          {planilhaData.categorias.map(cat => (
+                            <option key={cat} value={cat} />
+                          ))}
+                        </datalist>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Descrição</label>
+                        <input
+                          className="form-input"
+                          type="text"
+                          value={novaEntrada.descricao}
+                          onChange={(e) => setNovaEntrada({ ...novaEntrada, descricao: e.target.value })}
+                          placeholder="Descreva a entrada..."
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Valor (R$)</label>
+                        <input
+                          className="form-input"
+                          type="number"
+                          step="0.01"
+                          value={novaEntrada.valor}
+                          onChange={(e) => setNovaEntrada({ ...novaEntrada, valor: parseFloat(e.target.value) })}
+                          placeholder="0,00"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Data</label>
+                        <input
+                          className="form-input"
+                          type="date"
+                          value={novaEntrada.data}
+                          onChange={(e) => setNovaEntrada({ ...novaEntrada, data: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <button onClick={adicionarEntrada} className="btn btn-primary">
+                      ➕ Adicionar Entrada
+                    </button>
+                  </section>
+
+                  <section className="section">
+                    <div className="section-header">
+                      <h2 className="section-title">
+                        📋 Entradas ({planilhaData.entradas.length})
+                      </h2>
+                    </div>
+
                     {planilhaData.entradas.length === 0 ? (
-                      <p className="empty-state">Nenhuma entrada cadastrada ainda.</p>
+                      <div className="empty-state">
+                        <div className="empty-state-icon">📝</div>
+                        <div className="empty-state-title">Nenhuma entrada ainda</div>
+                        <div className="empty-state-description">
+                          Comece adicionando sua primeira receita ou despesa!
+                        </div>
+                      </div>
                     ) : (
-                      <table className="tabela-entradas">
-                        <thead>
-                          <tr>
-                            <th>Data</th>
-                            <th>Tipo</th>
-                            <th>Categoria</th>
-                            <th>Descrição</th>
-                            <th>Valor</th>
-                            <th>Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {planilhaData.entradas.map(entrada => (
-                            <tr key={entrada.id}>
-                              <td>{new Date(entrada.data).toLocaleDateString('pt-BR')}</td>
-                              <td>
-                                <span className={`badge badge-${entrada.tipo}`}>
-                                  {entrada.tipo}
-                                </span>
-                              </td>
-                              <td>{entrada.categoria}</td>
-                              <td>{entrada.descricao}</td>
-                              <td className={entrada.tipo === 'receita' ? 'valor-positivo' : 'valor-negativo'}>
-                                R$ {entrada.valor.toFixed(2)}
-                              </td>
-                              <td>
+                      <div className="entries-list">
+                        {planilhaData.entradas
+                          .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+                          .map(entrada => (
+                            <div key={entrada.id} className="entry-card">
+                              <div className="entry-info">
+                                <div className="entry-category">{entrada.categoria}</div>
+                                <div className="entry-description">{entrada.descricao}</div>
+                                <div className="entry-date">
+                                  {new Date(entrada.data).toLocaleDateString('pt-BR')}
+                                </div>
+                              </div>
+                              <div className="entry-actions">
+                                <div className={`entry-value ${entrada.tipo}`}>
+                                  {entrada.tipo === 'receita' ? '+' : '-'}R$ {entrada.valor.toFixed(2)}
+                                </div>
                                 <button
                                   onClick={() => removerEntrada(entrada.id)}
-                                  className="btn-danger-small"
+                                  className="btn-icon"
+                                  aria-label="Remover"
                                 >
                                   🗑️
                                 </button>
-                              </td>
-                            </tr>
+                              </div>
+                            </div>
                           ))}
-                        </tbody>
-                      </table>
+                      </div>
                     )}
-                  </div>
-                </div>
+                  </section>
+                </>
               )}
 
               {abaAtiva === 'consolidado' && (
-                <div className="aba-consolidado">
-                  <h2>Visão Consolidada</h2>
-                  <div className="acoes-consolidado">
-                    <button onClick={exportarExcel} className="btn-export" disabled={carregando}>
+                <section className="section">
+                  <div className="section-header">
+                    <h2 className="section-title">📊 Visão Consolidada</h2>
+                    <button onClick={exportarExcel} className="btn btn-success" disabled={carregando}>
                       {carregando ? '⏳ Exportando...' : '📥 Exportar Excel'}
                     </button>
                   </div>
 
-                  <div className="estatisticas">
-                    <h3>Por Categoria</h3>
-                    <table className="tabela-resumo">
-                      <thead>
-                        <tr>
-                          <th>Categoria</th>
-                          <th>Receitas</th>
-                          <th>Despesas</th>
-                          <th>Saldo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Array.from(new Set(planilhaIntegrada.entradas.map(e => e.categoria))).map(cat => {
-                          const receitasCat = planilhaIntegrada.entradas
-                            .filter(e => e.categoria === cat && e.tipo === 'receita')
-                            .reduce((acc, e) => acc + e.valor, 0);
-                          const despesasCat = planilhaIntegrada.entradas
-                            .filter(e => e.categoria === cat && e.tipo === 'despesa')
-                            .reduce((acc, e) => acc + e.valor, 0);
-                          const saldoCat = receitasCat - despesasCat;
+                  <div className="entries-list">
+                    {Array.from(new Set(planilhaIntegrada.entradas.map(e => e.categoria))).map(cat => {
+                      const receitasCat = planilhaIntegrada.entradas
+                        .filter(e => e.categoria === cat && e.tipo === 'receita')
+                        .reduce((acc, e) => acc + (Number(e.valor) || 0), 0);
+                      const despesasCat = planilhaIntegrada.entradas
+                        .filter(e => e.categoria === cat && e.tipo === 'despesa')
+                        .reduce((acc, e) => acc + (Number(e.valor) || 0), 0);
+                      const saldoCat = receitasCat - despesasCat;
 
-                          return (
-                            <tr key={cat}>
-                              <td><strong>{cat}</strong></td>
-                              <td className="valor-positivo">R$ {receitasCat.toFixed(2)}</td>
-                              <td className="valor-negativo">R$ {despesasCat.toFixed(2)}</td>
-                              <td className={saldoCat >= 0 ? 'valor-positivo' : 'valor-negativo'}>
-                                R$ {saldoCat.toFixed(2)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                      return (
+                        <div key={cat} className="entry-card">
+                          <div className="entry-info">
+                            <div className="entry-category">CATEGORIA</div>
+                            <div className="entry-description">{cat}</div>
+                            <div className="entry-date">
+                              Receitas: R$ {receitasCat.toFixed(2)} | Despesas: R$ {despesasCat.toFixed(2)}
+                            </div>
+                          </div>
+                          <div className={`entry-value ${saldoCat >= 0 ? 'receita' : 'despesa'}`}>
+                            R$ {saldoCat.toFixed(2)}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                </section>
               )}
 
               {abaAtiva === 'openfinance' && (
-                <div className="aba-openfinance">
-                  <h2>🏦 Open Finance</h2>
-                  <button
-                    onClick={atualizarOpenFinance}
-                    className="btn-primary"
-                    disabled={carregando}
-                  >
-                    {carregando ? '⏳ Atualizando...' : '🔄 Atualizar Dados'}
-                  </button>
+                <section className="section">
+                  <div className="section-header">
+                    <h2 className="section-title">🏦 Open Finance</h2>
+                    <button
+                      onClick={atualizarOpenFinance}
+                      className="btn btn-primary"
+                      disabled={carregando}
+                    >
+                      {carregando ? '⏳ Atualizando...' : '🔄 Atualizar'}
+                    </button>
+                  </div>
 
-                  {snapshot && (
-                    <div className="snapshot-resumo">
-                      <h3>Resumo Financeiro</h3>
-                      <div className="cards-snapshot">
-                        <div className="card-snapshot">
-                          <div className="card-label">🏦 Contas</div>
-                          <div className="card-valor">{snapshot.contas?.length || 0}</div>
-                        </div>
-                        <div className="card-snapshot">
-                          <div className="card-label">💳 Cartões</div>
-                          <div className="card-valor">{snapshot.cartoes?.length || 0}</div>
-                        </div>
-                        <div className="card-snapshot">
-                          <div className="card-label">📈 Investimentos</div>
-                          <div className="card-valor">{snapshot.investimentos?.length || 0}</div>
-                        </div>
-                        <div className="card-snapshot">
-                          <div className="card-label">💰 Operações Crédito</div>
-                          <div className="card-valor">{snapshot.operacoes_credito?.length || 0}</div>
+                  {!snapshot ? (
+                    <div className="empty-state">
+                      <div className="empty-state-icon">🏦</div>
+                      <div className="empty-state-title">Conecte-se ao Open Finance</div>
+                      <div className="empty-state-description">
+                        Clique em "Atualizar" para buscar seus dados financeiros
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="summary-cards">
+                      <div className="summary-card">
+                        <div className="card-icon">🏦</div>
+                        <div className="card-content">
+                          <div className="card-label">Contas</div>
+                          <div className="card-value">{snapshot.contas?.length || 0}</div>
                         </div>
                       </div>
-
-                      {snapshot.contas && snapshot.contas.length > 0 && (
-                        <div className="detalhes-section">
-                          <h4>💰 Contas</h4>
-                          <table className="tabela-of">
-                            <thead>
-                              <tr>
-                                <th>Instituição</th>
-                                <th>Tipo</th>
-                                <th>Agência</th>
-                                <th>Número</th>
-                                <th>Saldo</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {snapshot.contas.map(conta => {
-                                const inst = snapshot.instituicoes?.find(i => i.id === conta.instituicao_id);
-                                return (
-                                  <tr key={conta.id}>
-                                    <td>{inst?.nome || 'N/A'}</td>
-                                    <td>{conta.tipo}</td>
-                                    <td>{conta.agencia}</td>
-                                    <td>{conta.numero}</td>
-                                    <td className="valor-positivo">R$ {conta.saldo.toFixed(2)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
+                      <div className="summary-card">
+                        <div className="card-icon">💳</div>
+                        <div className="card-content">
+                          <div className="card-label">Cartões</div>
+                          <div className="card-value">{snapshot.cartoes?.length || 0}</div>
                         </div>
-                      )}
+                      </div>
+                      <div className="summary-card">
+                        <div className="card-icon">📈</div>
+                        <div className="card-content">
+                          <div className="card-label">Investimentos</div>
+                          <div className="card-value">{snapshot.investimentos?.length || 0}</div>
+                        </div>
+                      </div>
                     </div>
                   )}
-                </div>
+                </section>
               )}
 
               {abaAtiva === 'regras' && (
-                <div className="aba-regras">
-                  <h2>⚙️ Regras IA</h2>
-                  <button
-                    onClick={() => setModalAberto('regras')}
-                    className="btn-primary"
-                  >
-                    🛠️ Gerenciar Regras
-                  </button>
-
-                  <div className="regras-resumo">
-                    <p>Regras ativas: <strong>{regrasIA.filter(r => r.ativa).length}</strong></p>
-                    <p>Total de regras: <strong>{regrasIA.length}</strong></p>
+                <section className="section">
+                  <div className="section-header">
+                    <h2 className="section-title">⚙️ Regras IA</h2>
+                    <button
+                      onClick={() => setModalAberto('regras')}
+                      className="btn btn-primary"
+                    >
+                      🛠️ Gerenciar
+                    </button>
                   </div>
-                </div>
+
+                  <div className="summary-cards">
+                    <div className="summary-card">
+                      <div className="card-icon">✅</div>
+                      <div className="card-content">
+                        <div className="card-label">Regras Ativas</div>
+                        <div className="card-value">{regrasIA.filter(r => r.ativa).length}</div>
+                      </div>
+                    </div>
+                    <div className="summary-card">
+                      <div className="card-icon">📋</div>
+                      <div className="card-content">
+                        <div className="card-label">Total de Regras</div>
+                        <div className="card-value">{regrasIA.length}</div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
               )}
 
               {abaAtiva === 'backup' && (
-                <div className="aba-backup">
-                  <h2>💾 Backup e Restauração</h2>
+                <section className="section">
+                  <div className="section-header">
+                    <h2 className="section-title">💾 Backup e Restauração</h2>
+                  </div>
 
-                  <div className="backup-actions">
-                    <button onClick={exportarBackup} className="btn-export">
+                  <div className="btn-group">
+                    <button onClick={exportarBackup} className="btn btn-success">
                       📥 Exportar Backup
                     </button>
 
-                    <div className="import-group">
-                      <label htmlFor="import-backup" className="btn-import">
-                        📤 Importar Backup
-                      </label>
+                    <label htmlFor="import-backup" className="btn btn-primary">
+                      📤 Importar Backup
                       <input
                         id="import-backup"
                         type="file"
@@ -598,24 +683,67 @@ function App() {
                         onChange={importarBackup}
                         style={{ display: 'none' }}
                       />
-                    </div>
+                    </label>
                   </div>
 
-                  <div className="backup-info">
-                    <h3>ℹ️ Informações</h3>
-                    <p>O backup contém:</p>
-                    <ul>
+                  <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#f5f5f5', borderRadius: '8px' }}>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>ℹ️ O backup contém:</h3>
+                    <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
                       <li>✅ Todas as entradas cadastradas</li>
                       <li>✅ Regras IA configuradas</li>
                       <li>✅ Configurações de projeção</li>
                       <li>❌ Dados do Open Finance (serão recarregados)</li>
                     </ul>
                   </div>
-                </div>
+                </section>
               )}
-            </div>
+            </main>
 
-            {/* Modais dos Agentes */}
+            {/* Bottom Navigation (Mobile) */}
+            <nav className="bottom-nav">
+              <div className="bottom-nav-content">
+                <button
+                  className={`bottom-nav-item ${abaAtiva === 'entradas' ? 'active' : ''}`}
+                  onClick={() => setAbaAtiva('entradas')}
+                >
+                  <div className="bottom-nav-icon">📝</div>
+                  <div className="bottom-nav-label">Entradas</div>
+                </button>
+
+                <button
+                  className={`bottom-nav-item ${abaAtiva === 'consolidado' ? 'active' : ''}`}
+                  onClick={() => setAbaAtiva('consolidado')}
+                >
+                  <div className="bottom-nav-icon">📊</div>
+                  <div className="bottom-nav-label">Relatório</div>
+                </button>
+
+                <button
+                  className="bottom-nav-item main"
+                  onClick={() => setMenuAberto(true)}
+                >
+                  <div className="bottom-nav-icon">➕</div>
+                </button>
+
+                <button
+                  className={`bottom-nav-item ${abaAtiva === 'openfinance' ? 'active' : ''}`}
+                  onClick={() => setAbaAtiva('openfinance')}
+                >
+                  <div className="bottom-nav-icon">🏦</div>
+                  <div className="bottom-nav-label">Open</div>
+                </button>
+
+                <button
+                  className="bottom-nav-item"
+                  onClick={() => setModalAberto('ai')}
+                >
+                  <div className="bottom-nav-icon">💬</div>
+                  <div className="bottom-nav-label">IA</div>
+                </button>
+              </div>
+            </nav>
+
+            {/* Modais */}
             {modalAberto === 'ai' && (
               <AIChat
                 planilha={planilhaIntegrada}
